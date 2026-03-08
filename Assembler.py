@@ -1,9 +1,15 @@
+#iteration 7 #last iteration #added complete error handling and compatablity with code in assigment folder
+#iteration 6
 #iteration 5
-#iteration 4
+#iteration 4 
 #iteration 3
 #iteration 2
 #iteration 1
-lines=[]
+import sys
+if len(sys.argv)<3:
+    print('usage: Assembler.py <in> <out> [readable]'); sys.exit(1)
+with open(sys.argv[1],'r') as f:
+    lines=[l.rstrip('\n').rstrip('\r') for l in f.readlines()]
 
 program_counter=0
 instru_lines=[]
@@ -25,12 +31,24 @@ label_dict={}
 instr_to_line=[]
 
 for line_num,line in enumerate(lines,1):#chopping off all the lables ,regs and removing trash like comma and all
-    temp=line.split()
-    temp=[i.replace(',','') for i in temp]
+    stripped=line.strip()
+    if not stripped: 
+        continue
+    string=stripped.split()
+    temp=[]
+    for i in string:
+        parts=[p.strip() for p in i.split(',') if p.strip()]
+        temp.extend(parts)
     if len(temp)==1 and temp[0].endswith(':'):
+        if temp[0].replace(':','') in label_dict:
+            print(f"duplicate label '{temp[0].replace(':','')}'")
+            sys.exit(1)
         label_dict[temp[0].replace(':','')]=len(pure_lines)
     else:
         if temp[0].endswith(':'):
+            if temp[0].replace(':','') in label_dict:
+                print(f"duplicate label '{temp[0].replace(':','')}'")
+                sys.exit(1)
             label_dict[temp[0].replace(':','')]=len(pure_lines)
             temp=temp[1:]
         pure_lines.append(temp)
@@ -38,20 +56,14 @@ for line_num,line in enumerate(lines,1):#chopping off all the lables ,regs and r
 #####################################################
 
 
-#making main structure of code:
-
-def error(msg):
-    print(f"syntax error at line {instr_to_line[program_counter]} : {msg}")
-
 def get_register(mnemonic):
     global regs
+    if mnemonic not in regs:
+        print(f"unknown register '{mnemonic}'")
+        sys.exit(1)
     bit=regs[mnemonic]
     return f"{bit:0{5}b}"
 
-def to_signed_bits(val,nbits):#this function convert an immediate value into fixed width 2's complement bits
-    if val<0:
-        val=val+(1<<nbits)
-    return format(val&((1<<nbits)-1),f'0{nbits}b')
 
 def paranthesis_tackle(s):#takeling the paranthesis in some operations for ex:- lw r1 ,-->10(a0)<--here
     global regs
@@ -65,11 +77,19 @@ def paranthesis_tackle(s):#takeling the paranthesis in some operations for ex:- 
     return rd,imm12
 
 
+def to_signed_bits(val,nbits):#this function convert an immediate value into fixed width 2's complement bits
+    if val<0:
+        val=val+(1<<nbits)
+    return format(val&((1<<nbits)-1),f'0{nbits}b')
+
+
 def lable_offset_b(lable):
     global label_dict,program_counter
     try:
         offset=int(lable)
-    except ValueError:
+    except:
+        if lable not in label_dict:
+            error(f"undefined label '{lable}'")
         offset=(label_dict[lable]-program_counter)*4
     return to_signed_bits(offset,13)
 
@@ -78,39 +98,59 @@ def lable_offset_j(lable):
     global label_dict,program_counter
     try:
         offset=int(lable)
-    except ValueError:
+    except:
+        if lable not in label_dict:
+            error(f"undefined label '{lable}'")
         offset=(label_dict[lable]-program_counter)*4
     return to_signed_bits(offset,21)
 
+def error(msg):
+    print(f"syntax error at line {instr_to_line[program_counter]} : {msg}")
+    sys.exit(1)
+
 #encoding block will return all the encoded instruction directly
 def encoding_r(opcode, f3, f7, rd, rs1, rs2):
-    return f"{f7}{rs2}{rs1}{f3}{rd}{opcode}"
+    global instru_lines
+    instru_str=f"{f7}{rs2}{rs1}{f3}{rd}{opcode}"
+    instru_lines.append(instru_str)
     
 def encoding_i(opcode, f3, rd, rs1, imm):
-    return f"{imm}{rs1}{f3}{rd}{opcode}"
+    global instru_lines
+    instru_str=f"{imm}{rs1}{f3}{rd}{opcode}"
+    instru_lines.append(instru_str)
 
 def encoding_s(opcode, f3, rs1, rs2, imm):
-    return f"{imm[:7]}{rs2}{rs1}{f3}{imm[7:]}{opcode}"
+    global instru_lines
+    instru_str=f"{imm[:7]}{rs2}{rs1}{f3}{imm[7:]}{opcode}"
+    instru_lines.append(instru_str)
 
 def encoding_b(opcode, f3, rs1, rs2, imm):
-    return f"{imm[0]}{imm[2:8]}{rs2}{rs1}{f3}{imm[8:12]}{imm[1]}{opcode}"
+    global instru_lines
+    instru_str=f"{imm[0]}{imm[2:8]}{rs2}{rs1}{f3}{imm[8:12]}{imm[1]}{opcode}"
+    instru_lines.append(instru_str)
 
 def encoding_u(opcode, rd, imm):
-    return f"{imm[:20]}{rd}{opcode}"
+    global instru_lines
+    instru_str=f"{imm[:20]}{rd}{opcode}"
+    instru_lines.append(instru_str)
 
 def encoding_j(opcode, rd, imm):
-    return f"{imm[0]}{imm[10:20]}{imm[9]}{imm[1:9]}{rd}{opcode}"
+    global instru_lines
+    # imm is 21 bits: imm[20|10:1|11|19:12]
+    # imm[0]=bit20, imm[1:9]=bit19:12, imm[9]=bit11, imm[10:20]=bit10:1
+    instru_str=f"{imm[0]}{imm[10:20]}{imm[9]}{imm[1:9]}{rd}{opcode}"
+    instru_lines.append(instru_str)
 
 
 def runner(n):#all the instruction are seperated by their type or by diff opcode [note:- i have used opcode copied from web]
-    global pure_lines,program_counter,instru_lines
+    global pure_lines,program_counter
     temp=pure_lines[n]
     valid_ops=['add','sub','sll','slt','sltu','xor','srl','or','and','mul',
         'addi','sltiu','jalr','lw','sw',
         'beq','bne','blt','bge','bltu','bgeu',
         'lui','auipc','jal','rvrs','rst','halt']
     if temp[0] not in valid_ops:
-        error("instruction used is not defined")
+        error(f"instruction used is not defined")
         return
         
     f7s = {
@@ -123,43 +163,93 @@ def runner(n):#all the instruction are seperated by their type or by diff opcode
     
     #r type instru
     if temp[0] in ("add","sub","sll","slt","sltu","xor","srl","or","and","mul"):
-        instru_lines.append(encoding_r("0110011",f3s[temp[0]],f7s[temp[0]],get_register(temp[1]),get_register(temp[2]),get_register(temp[3])))
+        try:
+            encoding_r("0110011",f3s[temp[0]],f7s[temp[0]],get_register(temp[1]),get_register(temp[2]),get_register(temp[3]))
+        except:
+            error(f"problem in encoding_r")
+    if temp[0]=="rvrs":
+        try:
+            r5,imm12=paranthesis_tackle(temp[2])
+            encoding_i("0001011","000","0000000",r5,imm12)
+        except:
+            error(f"problem in encoding_r")
     
     #i type instru
     if temp[0]=="addi":
-        instru_lines.append(encoding_i("0010011","000",get_register(temp[1]),get_register(temp[2]),to_signed_bits(int(temp[3]),12)))
+        try:
+            encoding_i("0010011","000",get_register(temp[1]),get_register(temp[2]),to_signed_bits(int(temp[3]),12))
+        except:
+            error(f"problem in encoding_i")
     if temp[0]=="lw":
-        r5,imm12=paranthesis_tackle(temp[2])
-        instru_lines.append(encoding_i("0000011","010",get_register(temp[1]),r5,imm12))
+        try:
+            r5,imm12=paranthesis_tackle(temp[2])
+            encoding_i("0000011","010",get_register(temp[1]),r5,imm12)
+        except:
+            error(f"problem in encoding_i")
     if temp[0]=="sltiu":
-        instru_lines.append(encoding_i("0010011","011",get_register(temp[1]),get_register(temp[2]),to_signed_bits(int(temp[3]),12)))
+        try:
+            encoding_i("0010011","011",get_register(temp[1]),get_register(temp[2]),to_signed_bits(int(temp[3]),12))
+        except:
+            error(f"problem in encoding_i")
     if temp[0]=="jalr":
-        instru_lines.append(encoding_i("1100111","000",get_register(temp[1]),get_register(temp[2]),to_signed_bits(int(temp[3]),12)))
-
+        try:
+            encoding_i("1100111","000",get_register(temp[1]),get_register(temp[2]),to_signed_bits(int(temp[3]),12))
+        except:
+            error(f"problem in encoding_i")
+    if temp[0]=="rst":
+        try:
+            encoding_i("1110011","000","00000","00000","000000000001") 
+        except:
+            error(f"problem in encoding_i")
+    if temp[0]=="halt":
+        try:
+            encoding_i("1110011","000","00000","00000","000000000000")
+        except:
+            error(f"problem in encoding_i")
+    
     #s type instru 0100011
     if temp[0]=="sw":
-        r5,imm12=paranthesis_tackle(temp[2])
-        instru_lines.append(encoding_s("0100011","010",r5,get_register(temp[1]),imm12))
+        try:
+            r5,imm12=paranthesis_tackle(temp[2])
+            encoding_s("0100011","010",r5,get_register(temp[1]),imm12)
+        except:
+            error(f"problem in encoding_s")
     
     #b type instru 1100011
     b3={'beq':'000','bne':'001','blt':'100','bge':'101','bltu':'110','bgeu':'111'}
     if temp[0] in b3:
-        instru_lines.append(encoding_b("1100011",b3[temp[0]],get_register(temp[1]),get_register(temp[2]),lable_offset_b(temp[3])))
+        try:
+            encoding_b("1100011",b3[temp[0]],get_register(temp[1]),get_register(temp[2]),lable_offset_b(temp[3]))
+        except:
+            error(f"problem in encoding_b")
     
     #u type instru
     if temp[0]=='lui':
-        instru_lines.append(encoding_u("0110111",get_register(temp[1]),format(int(temp[2])&0xFFFFF,"020b")))
+        try:
+            encoding_u("0110111",get_register(temp[1]),format(int(temp[2])&0xFFFFF,"020b"))
+        except:
+            error(f"problem in encoding_u")
     if temp[0]=='auipc':
-        instru_lines.append(encoding_u("0010111",get_register(temp[1]),format(int(temp[2])&0xFFFFF,"020b")))
+        try:
+            encoding_u("0010111",get_register(temp[1]),format(int(temp[2])&0xFFFFF,"020b"))
+        except:
+            error(f"problem in encoding_u")
 
     #j type instru
     if temp[0]=='jal':
-        instru_lines.append(encoding_j("1101111",get_register(temp[1]),lable_offset_j(temp[2])))
+        try:
+            encoding_j("1101111",get_register(temp[1]),lable_offset_j(temp[2]))
+        except:
+            error(f"problem in encoding_j")
     
 
 while program_counter<len(pure_lines):
     runner(program_counter)
     program_counter+=1
 
-for line in instru_lines:
-    print(line)
+with open(sys.argv[2],'w') as f:
+    f.write('\n'.join(instru_lines)+'\n')
+if len(sys.argv)>3:
+    with open(sys.argv[3],'w') as f:
+        f.write('\n'.join(instru_lines)+'\n')
+#~dev chaudhary

@@ -8,7 +8,6 @@
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20WSL-informational?style=flat-square&logo=linux&logoColor=white)
 
 ---
-
 ## Overview
 
 This project implements a custom **32-bit RISC-V-like Instruction Set Architecture** consisting of two core components:

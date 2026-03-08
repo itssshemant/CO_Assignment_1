@@ -100,7 +100,7 @@ Execute  →  Perform ALU operation or memory access
 Update   →  Log register trace and advance the Program Counter
 ```
 
----
+
 
 ## Team
 

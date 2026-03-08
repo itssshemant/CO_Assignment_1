@@ -1,3 +1,4 @@
+#iteration 3 #completeing structures and logic
 #iteration 2
 #iteration 1
 lines=["adii r1 ,r1 ,5"]
@@ -38,6 +39,28 @@ for line_num,line in enumerate(lines,1):#chopping off all the lables ,regs and r
 
 def error(msg):
     return f"{msg} error at line no:{program_counter}"
+
+def get_register(mnemonic):
+    global regs
+    
+    bit=regs[mnemonic]
+    return f"{bit:0{5}b}"
+
+def to_signed_bits(val,nbits):
+    if val<0:
+        val=val+(1<<nbits)
+    return format(val&((1<<nbits)-1),f'0{nbits}b')
+
+def paranthesis_tackle(s):#takeling the paranthesis in some operations for ex:- lw r1 ,-->10(a0)<--here
+    global regs
+    offset,mnemonic=s.replace(')','').split('(')
+    offset=int(offset)
+    num=regs[mnemonic]
+    
+    imm12=to_signed_bits(offset,12)
+    rd=f"{num:05b}"
+    
+    return rd,imm12
 
 #encoding block will return all the encoded instruction directly
 def encoding_r(opcode, f3, f7, rd, rs1, rs2):
@@ -80,36 +103,38 @@ def runner(n):#all the instruction are seperated by their type or by diff opcode
     
     #r type instru
     if temp[0] in ("add","sub","sll","slt","sltu","xor","srl","or","and","mul"):
-        encoding_r()
+        encoding_r("0110011",f3s[temp[0]],f7s[temp[0]],get_register(temp[1]),get_register(temp[2]),get_register(temp[3]))
     
     #i type instru
     if temp[0]=="addi":
-        encoding_i()
+        encoding_i("0010011","000",get_register(temp[1]),get_register(temp[2]),to_signed_bits(int(temp[3]),12))
     if temp[0]=="lw":
-        encoding_i()
+        r5,imm12=paranthesis_tackle(temp[2])
+        encoding_i("0000011","010",get_register(temp[1]),r5,imm12)
     if temp[0]=="sltiu":
-        encoding_i()
+        encoding_i("0010011","011",get_register(temp[1]),get_register(temp[2]),to_signed_bits(int(temp[3]),12))
     if temp[0]=="jalr":
-        encoding_i()
+        encoding_i("1100111","000",get_register(temp[1]),get_register(temp[2]),to_signed_bits(int(temp[3]),12))
 
-    #s type instru 
+    #s type instru 0100011
     if temp[0]=="sw":
-        encoding_s()
+        r5,imm12=paranthesis_tackle(temp[2])
+        encoding_s("0100011","010",r5,get_register(temp[1]),imm12)
     
-    #b type instru 
+    #b type instru 1100011
     b3={'beq':'000','bne':'001','blt':'100','bge':'101','bltu':'110','bgeu':'111'}
     if temp[0] in b3:
-        encoding_b()
+        encoding_b("1100011",b3[temp[0]],get_register(temp[1]),get_register(temp[2]))
     
     #u type instru
     if temp[0]=='lui':
-        encoding_u()
+        encoding_u("0110111",get_register(temp[1]),format(int(temp[2])&0xFFFFF,"020b"))
     if temp[0]=='auipc':
-        encoding_u()
+        encoding_u("0010111",get_register(temp[1]),format(int(temp[2])&0xFFFFF,"020b"))
 
     #j type instru
     if temp[0]=='jal':
-        encoding_j()
+        encoding_j("1101111",get_register(temp[1]))
 
 while program_counter<len(pure_lines):
     instru_lines.append(runner(program_counter))
@@ -117,4 +142,4 @@ while program_counter<len(pure_lines):
 
 for line in instru_lines:
     print(line)
-#~piyush
+#~dev chaudhary

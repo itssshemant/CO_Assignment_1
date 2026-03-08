@@ -1,3 +1,4 @@
+#iteration 2
 #iteration 1
 lines=["adii r1 ,r1 ,5"]
 program_counter=0
@@ -38,6 +39,25 @@ for line_num,line in enumerate(lines,1):#chopping off all the lables ,regs and r
 def error(msg):
     return f"{msg} error at line no:{program_counter}"
 
+#encoding block will return all the encoded instruction directly
+def encoding_r(opcode, f3, f7, rd, rs1, rs2):
+    return f"{f7}{rs2}{rs1}{f3}{rd}{opcode}"
+    
+def encoding_i(opcode, f3, rd, rs1, imm):
+    return f"{imm}{rs1}{f3}{rd}{opcode}"
+
+def encoding_s(opcode, f3, rs1, rs2, imm):
+    return f"{imm[:7]}{rs2}{rs1}{f3}{imm[7:]}{opcode}"
+
+def encoding_b(opcode, f3, rs1, rs2, imm):
+    return f"{imm[0]}{imm[2:8]}{rs2}{rs1}{f3}{imm[8:12]}{imm[1]}{opcode}"
+
+def encoding_u(opcode, rd, imm):
+    return f"{imm[:20]}{rd}{opcode}"
+
+def encoding_j(opcode, rd, imm):
+    return f"{imm[0]}{imm[10:20]}{imm[9]}{imm[1:9]}{rd}{opcode}"
+
 
 def runner(n):#all the instruction are seperated by their type or by diff opcode note:- i have used opcode copied from web
     global pure_lines,program_counter
@@ -72,11 +92,11 @@ def runner(n):#all the instruction are seperated by their type or by diff opcode
     if temp[0]=="jalr":
         encoding_i()
 
-    #s type instru 0100011
+    #s type instru 
     if temp[0]=="sw":
         encoding_s()
     
-    #b type instru 1100011
+    #b type instru 
     b3={'beq':'000','bne':'001','blt':'100','bge':'101','bltu':'110','bgeu':'111'}
     if temp[0] in b3:
         encoding_b()
@@ -92,10 +112,9 @@ def runner(n):#all the instruction are seperated by their type or by diff opcode
         encoding_j()
 
 while program_counter<len(pure_lines):
-    runner(program_counter)
+    instru_lines.append(runner(program_counter))
     program_counter+=1
 
 for line in instru_lines:
     print(line)
-#~aditya
-
+#~piyush

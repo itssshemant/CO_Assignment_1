@@ -163,4 +163,3 @@ while program_counter<len(pure_lines):
 
 for line in instru_lines:
     print(line)
-
